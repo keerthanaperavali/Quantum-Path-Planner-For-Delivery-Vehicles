@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Maps - Hybrid Routing Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            height: calc(100vh - 200px);
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .controls-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .point-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .point-btn {
+            padding: 12px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .point-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .point-btn.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .constraints {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .constraint {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .constraint input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+
+        .constraint label {
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .route-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .route-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .route-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .route-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .route-info {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .classical {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+
+        .quantum {
+            background: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+        }
+
+        .route-info h4 {
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .route-info .metric {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .quantum-metrics {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .quantum-metrics .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #c62828;
+            margin-bottom: 15px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .legend-line {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .status {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+            }
+            
+            .controls-panel {
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 Quantum Maps</h1>
+            <p>Hybrid Classical-Quantum Routing Optimization</p>
+        </div>
+
+        <div class="main-content">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #2196f3;"></div>
+                        <span>Classical Route (A*)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #9c27b0;"></div>
+                        <span>Quantum Route (QAOA)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #4caf50;"></div>
+                        <span>🚀 Start</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #f44336;"></div>
+                        <span>🏁 End</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-panel">
+                <div class="section">
+                    <h3>📍 Route Points</h3>
+                    <div class="point-selector">
+                        <button class="point-btn" id="setStartBtn">Set Start 🚀</button>
+                        <button class="point-btn" id="setEndBtn">Set End 🏁</button>
+                    </div>
+                    <div class="status" id="pointStatus">
+                        Click a button above, then click on the map to set route points
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>⚙️ Constraints</h3>
+                    <div class="constraints">
+                        <div class="constraint">
+                            <input type="checkbox" id="avoidTolls">
+                            <label for="avoidTolls">Avoid Toll Roads</label>
+                        </div>
+                        <div class="constraint">
+                            <input type="checkbox" id="preferHighways">
+                            <label for="preferHighways">Prefer Highways</label>
+                        </div>
+                        <div class="constraint">
+                            <input type="checkbox" id="timeOfDay">
+                            <label for="timeOfDay">Consider Traffic</label>
+                        </div>
+                        <div class="constraint">
+                            <input type="checkbox" id="minCongestion" checked>
+                            <label for="minCongestion">Minimize Congestion</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <button class="route-btn" id="computeRoutes" disabled>
+                        🧮 Compute Hybrid Routes
+                    </button>
+                </div>
+
+                <div class="section" id="resultsSection" style="display: none;">
+                    <h3>📊 Results</h3>
+                    <div class="results">
+                        <div class="route-comparison">
+                            <div class="route-info classical">
+                                <h4>Classical A*</h4>
+                                <div class="metric" id="classicalTime">--</div>
+                                <small>minutes</small>
+                            </div>
+                            <div class="route-info quantum">
+                                <h4>Quantum QAOA</h4>
+                                <div class="metric" id="quantumTime">--</div>
+                                <small>minutes</small>
+                            </div>
+                        </div>
+                        
+                        <div class="quantum-metrics">
+                            <div class="metric-row">
+                                <span>QUBO Energy:</span>
+                                <span id="quboEnergy">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>Variables:</span>
+                                <span id="variableCount">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>Quantum Advantage:</span>
+                                <span id="quantumAdvantage">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        class QuantumMaps {
+            constructor() {
+                this.map = null;
+                this.startPoint = null;
+                this.endPoint = null;
+                this.startMarker = null;
+                this.endMarker = null;
+                this.classicalRoute = null;
+                this.quantumRoute = null;
+                this.currentMode = null;
+                
+                this.initMap();
+                this.initEventListeners();
+            }
+
+            initMap() {
+                // Initialize map centered on San Francisco for demo
+                this.map = L.map('map').setView([37.7749, -122.4194], 13);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors | Quantum Maps Demo',
+                    maxZoom: 19
+                }).addTo(this.map);
+
+                // Add map click handler
+                this.map.on('click', (e) => this.handleMapClick(e));
+            }
+
+            initEventListeners() {
+                document.getElementById('setStartBtn').addEventListener('click', () => {
+                    this.setMode('start');
+                });
+
+                document.getElementById('setEndBtn').addEventListener('click', () => {
+                    this.setMode('end');
+                });
+
+                document.getElementById('computeRoutes').addEventListener('click', () => {
+                    this.computeRoutes();
+                });
+            }
+
+            setMode(mode) {
+                this.currentMode = mode;
+                
+                // Update button styles
+                document.querySelectorAll('.point-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(mode === 'start' ? 'setStartBtn' : 'setEndBtn').classList.add('active');
+                
+                // Update status
+                const status = mode === 'start' ? 
+                    'Click on the map to set start point 🚀' : 
+                    'Click on the map to set end point 🏁';
+                document.getElementById('pointStatus').textContent = status;
+            }
+
+            handleMapClick(e) {
+                if (!this.currentMode) return;
+
+                const { lat, lng } = e.latlng;
+
+                if (this.currentMode === 'start') {
+                    this.setStartPoint(lat, lng);
+                } else if (this.currentMode === 'end') {
+                    this.setEndPoint(lat, lng);
+                }
+
+                this.currentMode = null;
+                document.querySelectorAll('.point-btn').forEach(btn => btn.classList.remove('active'));
+                this.updateStatus();
+            }
+
+            setStartPoint(lat, lng) {
+                if (this.startMarker) {
+                    this.map.removeLayer(this.startMarker);
+                }
+
+                this.startPoint = { lat, lng };
+                this.startMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        html: '🚀',
+                        iconSize: [30, 30],
+                        className: 'emoji-marker'
+                    })
+                }).addTo(this.map);
+
+                this.clearRoutes();
+            }
+
+            setEndPoint(lat, lng) {
+                if (this.endMarker) {
+                    this.map.removeLayer(this.endMarker);
+                }
+
+                this.endPoint = { lat, lng };
+                this.endMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        html: '🏁',
+                        iconSize: [30, 30],
+                        className: 'emoji-marker'
+                    })
+                }).addTo(this.map);
+
+                this.clearRoutes();
+            }
+
+            updateStatus() {
+                const computeBtn = document.getElementById('computeRoutes');
+                const status = document.getElementById('pointStatus');
+
+                if (this.startPoint && this.endPoint) {
+                    computeBtn.disabled = false;
+                    status.textContent = 'Ready to compute hybrid routes! 🚀';
+                    status.style.background = '#e8f5e8';
+                    status.style.borderLeftColor = '#4caf50';
+                } else if (this.startPoint) {
+                    status.textContent = 'Start point set. Now set an end point 🏁';
+                } else if (this.endPoint) {
+                    status.textContent = 'End point set. Now set a start point 🚀';
+                } else {
+                    computeBtn.disabled = true;
+                    status.textContent = 'Click a button above, then click on the map to set route points';
+                    status.style.background = '#fff3e0';
+                    status.style.borderLeftColor = '#ff9800';
+                }
+            }
+
+            clearRoutes() {
+                if (this.classicalRoute) {
+                    this.map.removeLayer(this.classicalRoute);
+                    this.classicalRoute = null;
+                }
+                if (this.quantumRoute) {
+                    this.map.removeLayer(this.quantumRoute);
+                    this.quantumRoute = null;
+                }
+                document.getElementById('resultsSection').style.display = 'none';
+            }
+
+            async computeRoutes() {
+                if (!this.startPoint || !this.endPoint) return;
+
+                const computeBtn = document.getElementById('computeRoutes');
+                const status = document.getElementById('pointStatus');
+                
+                computeBtn.disabled = true;
+                computeBtn.textContent = '🔄 Computing Routes...';
+                status.textContent = 'Computing hybrid classical-quantum routes...';
+                status.style.background = '#e3f2fd';
+                status.style.borderLeftColor = '#2196f3';
+
+                try {
+                    // Get constraints
+                    const constraints = {
+                        avoid_tolls: document.getElementById('avoidTolls').checked,
+                        prefer_highways: document.getElementById('preferHighways').checked,
+                        time_of_day: document.getElementById('timeOfDay').checked,
+                        min_congestion: document.getElementById('minCongestion').checked
+                    };
+
+                    // Simulate API call (in real implementation, this would call Flask backend)
+                    const result = await this.simulateRouteComputation(this.startPoint, this.endPoint, constraints);
+                    
+                    this.displayRoutes(result);
+                    this.showResults(result.metrics);
+
+                } catch (error) {
+                    console.error('Route computation failed:', error);
+                    status.innerHTML = '<div class="error">Route computation failed. Please try again.</div>';
+                } finally {
+                    computeBtn.disabled = false;
+                    computeBtn.textContent = '🧮 Compute Hybrid Routes';
+                }
+            }
+
+            async simulateRouteComputation(start, end, constraints) {
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Generate mock routes for demo
+                const classicalPath = this.generateMockRoute(start, end, 'classical');
+                const quantumPath = this.generateMockRoute(start, end, 'quantum');
+
+                return {
+                    classical_route: {
+                        coordinates: classicalPath,
+                        duration: 15.3,
+                        distance: 8.2
+                    },
+                    quantum_route: {
+                        coordinates: quantumPath,
+                        duration: 13.7,
+                        distance: 7.9
+                    },
+                    metrics: {
+                        qubo_energy: -42.5,
+                        variable_count: 156,
+                        quantum_advantage: 10.5, // percentage improvement
+                        classical_time: 15.3,
+                        quantum_time: 13.7
+                    }
+                };
+            }
+
+            generateMockRoute(start, end, type) {
+                // Generate a simple curved path between points
+                const points = [];
+                const steps = 8;
+                
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    
+                    // Linear interpolation with some curvature
+                    let lat = start.lat + (end.lat - start.lat) * t;
+                    let lng = start.lng + (end.lng - start.lng) * t;
+                    
+                    // Add different curves for classical vs quantum
+                    if (type === 'classical') {
+                        lat += Math.sin(t * Math.PI) * 0.003;
+                        lng += Math.cos(t * Math.PI * 2) * 0.002;
+                    } else {
+                        lat -= Math.sin(t * Math.PI) * 0.002;
+                        lng -= Math.cos(t * Math.PI * 3) * 0.003;
+                    }
+                    
+                    points.push([lat, lng]);
+                }
+                
+                return points;
+            }
+
+            displayRoutes(result) {
+                this.clearRoutes();
+
+                // Add classical route
+                this.classicalRoute = L.polyline(result.classical_route.coordinates, {
+                    color: '#2196f3',
+                    weight: 4,
+                    opacity: 0.8,
+                    dashArray: '5, 5'
+                }).addTo(this.map);
+
+                // Add quantum route
+                this.quantumRoute = L.polyline(result.quantum_route.coordinates, {
+                    color: '#9c27b0',
+                    weight: 4,
+                    opacity: 0.9
+                }).addTo(this.map);
+
+                // Fit map to show both routes
+                const group = new L.featureGroup([this.classicalRoute, this.quantumRoute]);
+                this.map.fitBounds(group.getBounds().pad(0.1));
+            }
+
+            showResults(metrics) {
+                document.getElementById('classicalTime').textContent = metrics.classical_time.toFixed(1);
+                document.getElementById('quantumTime').textContent = metrics.quantum_time.toFixed(1);
+                document.getElementById('quboEnergy').textContent = metrics.qubo_energy.toFixed(1);
+                document.getElementById('variableCount').textContent = metrics.variable_count;
+                
+                const advantage = metrics.quantum_advantage;
+                const advantageEl = document.getElementById('quantumAdvantage');
+            
+
+"""
+Fixed Quantum Optimization Module for Route Planning
+Addresses multiple route generation issues
+"""
+
+import numpy as np
+import logging
+import networkx as nx
+from typing import Dict, List, Tuple, Optional, Any
+
+# Quantum imports with better error handling
+try:
+    from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+    from qiskit.primitives import Sampler, Estimator
+    from qiskit.algorithms.optimizers import COBYLA, SPSA, SLSQP
+    from qiskit.algorithms import QAOA
+    from qiskit_optimization import QuadraticProgram
+    from qiskit_optimization.algorithms import MinimumEigenOptimizer
+    from qiskit_optimization.converters import QuadraticProgramToQubo
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+try:
+    import dimod
+    from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
+    DWAVE_AVAILABLE = True
+except ImportError:
+    DWAVE_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
+
+class QuantumRouteOptimizer:
+    """Fixed quantum optimizer for routing problems"""
+    
+    def __init__(self, config: Optional[Dict] = None):
+        self.config = config or {}
+        self.qaoa_reps = self.config.get('qaoa_reps', 2)
+        self.max_iter = self.config.get('max_iter', 100)
+        self.optimizer_name = self.config.get('optimizer', 'COBYLA')
+        self.use_dwave = self.config.get('use_dwave', False)
+        
+        self.classical_optimizer = self._get_classical_optimizer()
+        
+    def _get_classical_optimizer(self):
+        """Get classical optimizer for QAOA"""
+        optimizers = {
+            'COBYLA': COBYLA(maxiter=self.max_iter),
+            'SPSA': SPSA(maxiter=self.max_iter),
+            'SLSQP': SLSQP(maxiter=self.max_iter)
+        }
+        return optimizers.get(self.optimizer_name, COBYLA(maxiter=self.max_iter))
+    
+    def create_routing_qubo(self, graph: nx.Graph, start_node: Any, 
+                           end_node: Any, constraints: Dict) -> Tuple[np.ndarray, Dict]:
+        """Create QUBO formulation for shortest path routing problem"""
+        edges = list(graph.edges())
+        nodes = list(graph.nodes())
+        
+        # Limit problem size for quantum processing
+        max_edges = self.config.get('max_edges', 50)
+        if len(edges) > max_edges:
+            try:
+                shortest_path = nx.shortest_path(graph, start_node, end_node, weight='travel_time')
+                corridor_edges = self._get_corridor_edges(graph, shortest_path, edges, max_edges)
+                edges = corridor_edges
+            except:
+                edges = edges[:max_edges]
+        
+        n_edges = len(edges)
+        if n_edges == 0:
+            return np.array([]), {}
+            
+        edge_to_idx = {edge: i for i, edge in enumerate(edges)}
+        
+        # Initialize QUBO matrix
+        Q = np.zeros((n_edges, n_edges))
+        
+        # Objective function: minimize travel time/cost
+        for i, edge in enumerate(edges):
+            u, v = edge
+            edge_data = graph.edges[u, v]
+            cost = edge_data.get('travel_time', 60)
+            cost = self._apply_constraints(edge_data, cost, constraints)
+            Q[i, i] += cost
+        
+        # Flow conservation constraints
+        penalty_weight = self.config.get('penalty_weight', 1000)
+        Q = self._add_flow_constraints(Q, graph, edges, edge_to_idx, 
+                                     start_node, end_node, penalty_weight)
+        
+        logger.info(f"Created QUBO with {n_edges} variables")
+        return Q, edge_to_idx
+    
+    def _get_corridor_edges(self, graph: nx.Graph, shortest_path: List, 
+                           all_edges: List, max_edges: int) -> List:
+        """Select edges in corridor around shortest path"""
+        path_edges = []
+        for i in range(len(shortest_path) - 1):
+            edge = (shortest_path[i], shortest_path[i+1])
+            if edge in all_edges:
+                path_edges.append(edge)
+            elif (shortest_path[i+1], shortest_path[i]) in all_edges:
+                path_edges.append((shortest_path[i+1], shortest_path[i]))
+        
+        corridor_edges = set(path_edges)
+        path_nodes = set(shortest_path)
+        
+        for edge in all_edges:
+            if len(corridor_edges) >= max_edges:
+                break
+            u, v = edge
+            if u in path_nodes or v in path_nodes:
+                corridor_edges.add(edge)
+        
+        return list(corridor_edges)[:max_edges]
+    
+    def _apply_constraints(self, edge_data: Dict, base_cost: float, 
+                          constraints: Dict) -> float:
+        """Apply routing constraints to edge cost"""
+        cost = base_cost
+        
+        if constraints.get('avoid_tolls', False):
+            if edge_data.get('toll', False):
+                cost *= 2.0
+        
+        if constraints.get('prefer_highways', False):
+            highway_types = ['motorway', 'trunk', 'primary']
+            if edge_data.get('highway') in highway_types:
+                cost *= 0.8
+            else:
+                cost *= 1.2
+        
+        if constraints.get('time_of_day', False):
+            if edge_data.get('highway') in ['motorway', 'trunk']:
+                traffic_multiplier = np.random.uniform(1.2, 2.0)
+            else:
+                traffic_multiplier = np.random.uniform(1.0, 1.3)
+            cost *= traffic_multiplier
+        
+        if constraints.get('min_congestion', False):
+            congestion = np.random.uniform(1.0, 1.8)
+            cost *= congestion
+        
+        return cost
+    
+    def _add_flow_constraints(self, Q: np.ndarray, graph: nx.Graph, 
+                            edges: List, edge_to_idx: Dict,
+                            start_node: Any, end_node: Any, 
+                            penalty_weight: float) -> np.ndarray:
+        """Add flow conservation constraints to QUBO"""
+        nodes = set()
+        for edge in edges:
+            nodes.update(edge)
+        
+        for node in nodes:
+            if node == start_node or node == end_node:
+                continue
+            
+            incident_edges = []
+            for edge in edges:
+                if node in edge:
+                    incident_edges.append(edge_to_idx[edge])
+            
+            n_incident = len(incident_edges)
+            if n_incident > 1:
+                for i in range(n_incident):
+                    for j in range(i + 1, n_incident):
+                        idx_i, idx_j = incident_edges[i], incident_edges[j]
+                        Q[idx_i, idx_j] -= penalty_weight / (n_incident * (n_incident - 1))
+                        Q[idx_j, idx_i] -= penalty_weight / (n_incident * (n_incident - 1))
+        
+        return Q
+    
+    def solve_qaoa(self, Q: np.ndarray, edge_to_idx: Dict) -> Tuple[np.ndarray, float]:
+        """Solve QUBO using QAOA"""
+        if not QISKIT_AVAILABLE:
+            logger.warning("Qiskit not available, using classical fallback")
+            return self._solve_classical_fallback(Q)
+        
+        try:
+            n_vars = Q.shape[0]
+            if n_vars == 0:
+                return np.array([]), 0.0
+            
+            # Create QuadraticProgram
+            qp = QuadraticProgram()
+            for i in range(n_vars):
+                qp.binary_var(f'x_{i}')
+            
+            # Set objective
+            linear_terms = {}
+            quadratic_terms = {}
+            
+            for i in range(n_vars):
+                if abs(Q[i, i]) > 1e-10:
+                    linear_terms[f'x_{i}'] = float(Q[i, i])
+                
+                for j in range(i + 1, n_vars):
+                    if abs(Q[i, j]) > 1e-10:
+                        quadratic_terms[(f'x_{i}', f'x_{j}')] = float(Q[i, j] + Q[j, i])
+            
+            if not linear_terms and not quadratic_terms:
+                return np.zeros(n_vars), 0.0
+                
+            qp.minimize(linear=linear_terms, quadratic=quadratic_terms)
+            
+            # Convert to QUBO if needed
+            if quadratic_terms:
+                converter = QuadraticProgramToQubo()
+                qubo = converter.convert(qp)
+            else:
+                qubo = qp
+            
+            # Set up QAOA
+            sampler = Sampler()
+            qaoa = QAOA(sampler=sampler, 
+                       optimizer=self.classical_optimizer, 
+                       reps=self.qaoa_reps)
+            
+            optimizer = MinimumEigenOptimizer(qaoa)
+            result = optimizer.solve(qubo)
+            
+            # Extract solution
+            solution = np.zeros(n_vars)
+            if hasattr(result, 'x'):
+                solution = np.array(result.x[:n_vars])
+            elif hasattr(result, 'variables'):
+                for var in result.variables:
+                    if var.name.startswith('x_'):
+                        idx = int(var.name.split('_')[1])
+                        if idx < n_vars:
+                            solution[idx] = var.value
+            
+            energy = result.fval if hasattr(result, 'fval') else 0.0
+            
+            logger.info(f"QAOA solved with energy: {energy}")
+            return solution, energy
+            
+        except Exception as e:
+            logger.error(f"QAOA optimization failed: {e}")
+            return self._solve_classical_fallback(Q)
+    
+    def solve_dwave(self, Q: np.ndarray, edge_to_idx: Dict) -> Tuple[np.ndarray, float]:
+        """Complete D-Wave implementation"""
+        if not DWAVE_AVAILABLE or not self.use_dwave:
+            logger.warning("D-Wave not available or not enabled, using QAOA")
+            return self.solve_qaoa(Q, edge_to_idx)
+        
+        try:
+            n_vars = Q.shape[0]
+            if n_vars == 0:
+                return np.array([]), 0.0
+            
+            # Create BQM
+            bqm = dimod.BinaryQuadraticModel.empty('BINARY')
+            
+            # Add linear and quadratic terms
+            for i in range(n_vars):
+                if abs(Q[i, i]) > 1e-10:
+                    bqm.add_variable(i, Q[i, i])
+                
+                for j in range(i + 1, n_vars):
+                    if abs(Q[i, j]) > 1e-10:
+                        bqm.add_interaction(i, j, Q[i, j] + Q[j, i])
+            
+            # Use hybrid solver
+            sampler = LeapHybridSampler()
+            sampleset = sampler.sample(bqm, time_limit=10)
+            
+            # Extract best solution
+            best_sample = sampleset.first.sample
+            solution = np.array([best_sample.get(i, 0) for i in range(n_vars)])
+            energy = sampleset.first.energy
+            
+            logger.info(f"D-Wave solved with energy: {energy}")
+            return solution, energy
+            
+        except Exception as e:
+            logger.error(f"D-Wave optimization failed: {e}")
+            return self.solve_qaoa(Q, edge_to_idx)
+    
+    def _solve_classical_fallback(self, Q: np.ndarray) -> Tuple[np.ndarray, float]:
+        """Enhanced classical optimization fallback"""
+        n_vars = Q.shape[0]
+        if n_vars == 0:
+            return np.array([]), 0.0
+        
+        best_energy = float('inf')
+        best_solution = np.zeros(n_vars)
+        
+        # Multiple strategies for better solutions
+        n_trials = min(1000, 2**min(n_vars, 15))
+        
+        strategies = [
+            ('sparse', 0.2),
+            ('medium', 0.4),
+            ('dense', 0.6),
+            ('greedy', None)
+        ]
+        
+        for strategy, sparsity in strategies:
+            trials_per_strategy = n_trials // len(strategies)
+            
+            for _ in range(trials_per_strategy):
+                if strategy == 'greedy':
+                    # Greedy approach
+                    x = np.zeros(n_vars)
+                    diagonal_values = [(Q[i, i], i) for i in range(n_vars)]
+                    diagonal_values.sort()
+                    n_select = min(max(1, int(np.sqrt(n_vars))), n_vars // 2)
+                    for _, idx in diagonal_values[:n_select]:
+                        x[idx] = 1
+                else:
+                    # Random with different sparsity levels
+                    x = np.random.choice([0, 1], size=n_vars, p=[1-sparsity, sparsity])
+                
+                energy = x.T @ Q @ x
+                
+                if energy < best_energy:
+                    best_energy = energy
+                    best_solution = x.copy()
+        
+        logger.info(f"Classical fallback solved with energy: {best_energy}")
+        return best_solution, best_energy
+    
+    def solve(self, Q: np.ndarray, edge_to_idx: Dict, 
+              method: str = 'auto') -> Tuple[np.ndarray, float, Dict]:
+        """Solve QUBO using specified method"""
+        metadata = {
+            'method_used': method,
+            'problem_size': Q.shape[0],
+            'qiskit_available': QISKIT_AVAILABLE,
+            'dwave_available': DWAVE_AVAILABLE
+        }
+        
+        if method == 'auto':
+            if self.use_dwave and DWAVE_AVAILABLE:
+                method = 'dwave'
+            elif QISKIT_AVAILABLE:
+                method = 'qaoa'
+            else:
+                method = 'classical'
+        
+        metadata['method_used'] = method
+        
+        try:
+            if method == 'dwave':
+                solution, energy = self.solve_dwave(Q, edge_to_idx)
+            elif method == 'qaoa':
+                solution, energy = self.solve_qaoa(Q, edge_to_idx)
+            else:
+                solution, energy = self._solve_classical_fallback(Q)
+            
+            return solution, energy, metadata
+            
+        except Exception as e:
+            logger.error(f"Optimization method {method} failed: {e}")
+            # Always fall back to classical
+            solution, energy = self._solve_classical_fallback(Q)
+            metadata['method_used'] = 'classical_fallback'
+            return solution, energy, metadata
+
+class QuantumRoutingPipeline:
+    """Complete pipeline for quantum-enhanced routing"""
+    
+    def __init__(self, config: Optional[Dict] = None):
+        self.config = config or {}
+        self.optimizer = QuantumRouteOptimizer(config)
+        
+    def optimize_route(self, graph: nx.Graph, start_node: Any, end_node: Any,
+                      constraints: Dict) -> Dict:
+        """Complete quantum routing optimization pipeline"""
+        try:
+            # Create QUBO
+            Q, edge_to_idx = self.optimizer.create_routing_qubo(
+                graph, start_node, end_node, constraints
+            )
+            
+            if Q.shape[0] == 0:
+                logger.warning("Empty QUBO matrix, using classical fallback")
+                return self._fallback_classical_route(graph, start_node, end_node, constraints)
+            
+            # Solve QUBO
+            solution, energy, metadata = self.optimizer.solve(Q, edge_to_idx)
+            
+            # Decode solution to path
+            path, path_metrics = self._decode_solution_to_path(
+                solution, graph, edge_to_idx, start_node, end_node
+            )
+            
+            return {
+                'success': True,
+                'solution': solution.tolist(),
+                'energy': energy,
+                'path': path,
+                'path_metrics': path_metrics,
+                'metadata': metadata,
+                'qubo_size': Q.shape[0]
+            }
+            
+        except Exception as e:
+            logger.error(f"Quantum routing optimization failed: {e}")
+            return self._fallback_classical_route(graph, start_node, end_node, constraints)
+    
+    def _fallback_classical_route(self, graph: nx.Graph, start_node: Any, 
+                                 end_node: Any, constraints: Dict) -> Dict:
+        """Classical routing fallback"""
+        try:
+            path = nx.shortest_path(graph, start_node, end_node, weight='travel_time')
+            
+            total_time = 0
+            total_distance = 0
+            
+            for i in range(len(path) - 1):
+                edge_data = graph.edges[path[i], path[i+1]]
+                total_time += edge_data.get('travel_time', 60)
+                total_distance += edge_data.get('length', 100)
+            
+            return {
+                'success': True,
+                'path': path,
+                'path_metrics': {
+                    'distance': total_distance / 1000,
+                    'duration': total_time / 60,
+                    'edges_used': len(path) - 1
+                },
+                'metadata': {'method_used': 'classical_fallback'},
+                'fallback': True
+            }
+            
+        except Exception as e:
+            logger.error(f"Classical fallback failed: {e}")
+            return {'error': str(e), 'success': False}
+    
+    def _decode_solution_to_path(self, solution: np.ndarray, graph: nx.Graph,
+                                edge_to_idx: Dict, start_node: Any, 
+                                end_node: Any) -> Tuple[List, Dict]:
+        """Decode binary solution to actual path"""
+        
+        idx_to_edge = {idx: edge for edge, idx in edge_to_idx.items()}
+        selected_edges = []
+        
+        # Use threshold for edge selection
+        threshold = 0.5
+        for idx, value in enumerate(solution):
+            if value > threshold and idx in idx_to_edge:
+                selected_edges.append(idx_to_edge[idx])
+        
+        if not selected_edges:
+            # No edges selected, return shortest path
+            try:
+                path = nx.shortest_path(graph, start_node, end_node)
+                metrics = self._calculate_path_metrics(graph, path)
+                return path, metrics
+            except:
+                return [], {'distance': 0, 'duration': 0, 'edges_used': 0}
+        
+        try:
+            # Build subgraph from selected edges
+            path_graph = nx.Graph()
+            path_graph.add_edges_from(selected_edges)
+            
+            # Copy attributes
+            for node in path_graph.nodes():
+                if node in graph.nodes:
+                    path_graph.nodes[node].update(graph.nodes[node])
+            
+            for edge in selected_edges:
+                u, v = edge
+                if graph.has_edge(u, v):
+                    path_graph.edges[u, v].update(graph.edges[u, v])
+            
+            # Find path in selected subgraph
+            if nx.has_path(path_graph, start_node, end_node):
+                path = nx.shortest_path(path_graph, start_node, end_node)
+            else:
+                # Repair path
+                path = self._repair_path(graph, path_graph, start_node, end_node)
+            
+            metrics = self._calculate_path_metrics(graph, path)
+            metrics['edges_used'] = len(selected_edges)
+            
+            return path, metrics
+            
+        except Exception as e:
+            logger.error(f"Path decoding failed: {e}")
+            # Return classical path as fallback
+            try:
+                fallback_path = nx.shortest_path(graph, start_node, end_node)
+                metrics = self._calculate_path_metrics(graph, fallback_path)
+                return fallback_path, metrics
+            except:
+                return [], {'distance': 0, 'duration': 0, 'edges_used': 0}
+    
+    def _repair_path(self, original_graph: nx.Graph, path_graph: nx.Graph,
+                    start_node: Any, end_node: Any) -> List:
+        """Repair disconnected path by adding necessary edges"""
+        try:
+            # Ensure start and end nodes are present
+            if start_node not in path_graph:
+                path_graph.add_node(start_node)
+                if start_node in original_graph:
+                    path_graph.nodes[start_node].update(original_graph.nodes[start_node])
+                    
+            if end_node not in path_graph:
+                path_graph.add_node(end_node)
+                if end_node in original_graph:
+                    path_graph.nodes[end_node].update(original_graph.nodes[end_node])
+            
+            # If still no path, add shortest connecting path
+            if not nx.has_path(path_graph, start_node, end_node):
+                connecting_path = nx.shortest_path(original_graph, start_node, end_node)
+                
+                for i in range(len(connecting_path) - 1):
+                    u, v = connecting_path[i], connecting_path[i + 1]
+                    if original_graph.has_edge(u, v):
+                        path_graph.add_edge(u, v)
+                        path_graph.edges[u, v].update(original_graph.edges[u, v])
+            
+            return nx.shortest_path(path_graph, start_node, end_node)
+            
+        except Exception as e:
+            logger.error(f"Path repair failed: {e}")
+            return nx.shortest_path(original_graph, start_node, end_node)
+    
+    def _calculate_path_metrics(self, graph: nx.Graph, path: List) -> Dict:
+        """Calculate metrics for a given path"""
+        if len(path) < 2:
+            return {'distance': 0, 'duration': 0}
+        
+        total_distance = 0
+        total_duration = 0
+        
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            if graph.has_edge(u, v):
+                edge_data = graph.edges[u, v]
+                total_distance += edge_data.get('length', 100)
+                total_duration += edge_data.get('travel_time', 60)
+        
+        return {
+            'distance': total_distance / 1000,  # km
+            'duration': total_duration / 60,    # minutes
+        }
+
+def benchmark_quantum_vs_classical(graph: nx.Graph, start_node: Any, 
+                                 end_node: Any, constraints: Dict) -> Dict:
+    """Fixed benchmark function"""
+    
+    # Classical benchmark
+    try:
+        classical_path = nx.shortest_path(graph, start_node, end_node, weight='travel_time')
+        classical_time = sum(graph.edges[classical_path[i], classical_path[i+1]].get('travel_time', 60) 
+                           for i in range(len(classical_path)-1)) / 60
+        classical_distance = sum(graph.edges[classical_path[i], classical_path[i+1]].get('length', 100) 
+                               for i in range(len(classical_path)-1)) / 1000
+    except:
+        classical_path = []
+        classical_time = 0
+        classical_distance = 0
+    
+    # Quantum optimization
+    quantum_pipeline = QuantumRoutingPipeline()
+    quantum_result = quantum_pipeline.optimize_route(graph, start_node, end_node, constraints)
+    
+    if quantum_result.get('success', False):
+        quantum_path = quantum_result['path']
+        quantum_metrics = quantum_result['path_metrics']
+        quantum_time = quantum_metrics['duration']
+        quantum_distance = quantum_metrics['distance']
+    else:
+        quantum_path = classical_path
+        quantum_time = classical_time
+        quantum_distance = classical_distance
+    
+    # Calculate improvement
+    time_improvement = ((classical_time - quantum_time) / classical_time * 100) if classical_time > 0 else 0
+    distance_improvement = ((classical_distance - quantum_distance) / classical_distance * 100) if classical_distance > 0 else 0
+    
+    return {
+        'classical': {
+            'path': classical_path,
+            'duration': classical_time,
+            'distance': classical_distance
+        },
+        'quantum': {
+            'path': quantum_path,
+            'duration': quantum_time,
+            'distance': quantum_distance,
+            'metadata': quantum_result.get('metadata', {}),
+            'energy': quantum_result.get('energy', 0)
+        },
+        'improvements': {
+            'time_percent': time_improvement,
+            'distance_percent': distance_improvement,
+            'quantum_advantage': time_improvement > 1.0
+        }
+    }
+
+def create_demo_quantum_optimizer(use_dwave: bool = False) -> QuantumRoutingPipeline:
+    """Create a quantum optimizer configured for demo purposes"""
+    config = {
+        'qaoa_reps': 2,
+        'max_iter': 50,
+        'optimizer': 'COBYLA',
+        'max_edges': 30,
+        'penalty_weight': 500,
+        'use_dwave': use_dwave
+    }
+    return QuantumRoutingPipeline(config)
+
+    advantageEl.textContent = `${advantage.toFixed(1)}% faster`;
+                advantageEl.style.color = advantage > 0 ? '#4caf50' : '#f44336';
+
+                document.getElementById('resultsSection').style.display = 'block';
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new QuantumMaps();
+        });
+    </script>
+</body>
+</html>
